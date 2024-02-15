@@ -1,0 +1,11 @@
+{
+    "compilerOptions": {
+      "moduleResolution": "node",
+      "module": "ESNext",
+      "allowSyntheticDefaultImports": true,
+      "outDir": "./build",
+      "allowJs": true,
+      "target": "ESNext"
+    },
+    "include": ["./src/**/*"]
+}

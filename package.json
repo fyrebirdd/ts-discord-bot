@@ -1,0 +1,22 @@
+{
+  "name": "ts-discord-bot",
+  "version": "1.0.0",
+  "description": "A template for a discord bot made in Typescript",
+  "main": "/build/index.js",
+  "scripts": {
+    "clean": "rimraf build",
+    "dev": "npx tsc -w",
+    "deploy": "node /build/deployCommands.js"
+  },
+  "author": "Fyrebirdd",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.11.18",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1"
+  },
+  "type": "module"
+}
