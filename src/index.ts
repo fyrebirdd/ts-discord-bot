@@ -1,11 +1,10 @@
-import path from "node:path";
-
-import { Client, GatewayIntentBits } from "discord.js";
-import { fileURLToPath } from "node:url";
 import Commands from "./utils/CommandLoader.js";
 import Events from "./utils/EventLoader.js";
+import Data from "./utils/dataFolderUtils.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import { Client, GatewayIntentBits } from "discord.js";
+
+Data.LoadDotEnv();
 
 const client:Client = new Client({intents:[
     GatewayIntentBits.Guilds, 
@@ -16,10 +15,10 @@ const client:Client = new Client({intents:[
     GatewayIntentBits.GuildMessageReactions
 ]});
 
-Commands.SetFolderPath(path.join( __dirname, '/commands'));
-await Commands.Load();
+let commandsLoaded = await Commands.Load();
+console.log(`Loaded ${commandsLoaded} commands.`);
 
-Events.SetFolderPath(path.join( __dirname, '/events'));
-await Events.Load(client);
+let eventsLoaded = await Events.Load(client);
+console.log(`Loaded ${eventsLoaded} events.`);
 
 client.login(process.env.TEMPLATE_TOKEN);

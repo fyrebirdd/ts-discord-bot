@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { pathToFileURL } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { BaseCommand } from '../types/BaseCommand';
 
 class CommandLoader{
@@ -25,15 +25,15 @@ class CommandLoader{
 
     private constructor() {
         this.commands = new Map();
-        this.commandsFolderPath = null;
+        let workingDir = path.dirname(fileURLToPath(import.meta.url));
+        this.commandsFolderPath = path.join(workingDir, '/commands');
     }
 
-    public Fetch(){
+    public Fetch(name:string){
+        return this.commands.get(name);
+    }
+    public GetList(){
         return this.commands;
-    }
-
-    public SetFolderPath(folderPath: string){
-        this.commandsFolderPath = folderPath;
     }
 
     public async Load(){

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { Client, ClientEvents } from "discord.js";
 
 
@@ -26,8 +26,9 @@ class EventLoader{
         typeof obj.once === 'boolean';
     }
 
-    private constructor() {
-        this.eventsFolderPath = null;
+    private constructor(){
+        let workingDir = path.dirname(fileURLToPath(import.meta.url));
+        this.eventsFolderPath = path.join(workingDir, '/events');
     }
 
     public SetFolderPath(folderPath: string){
