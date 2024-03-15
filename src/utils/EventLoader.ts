@@ -16,7 +16,12 @@ class EventLoader{
         return EventLoader.instance;
     }
 
-    public static isEvent(obj:any){
+    /**
+     * Checks whether a given object can be cast to the BaseEvent type
+     * @param obj An object to evaluate.
+     * @returns {boolean} True if obj can be cast to BaseEvent type. False otherwise.
+     */
+    public static isEvent(obj:any): boolean{
         return obj instanceof Object && 
         'execute' in obj && 
         typeof obj.execute === 'function' &&
@@ -28,14 +33,15 @@ class EventLoader{
 
     private constructor(){
         let workingDir = path.dirname(fileURLToPath(import.meta.url));
-        this.eventsFolderPath = path.join(workingDir, '/events');
+        this.eventsFolderPath = path.resolve(workingDir, '../events');
     }
 
-    public SetFolderPath(folderPath: string){
-        this.eventsFolderPath = folderPath;
-    }
-
-    public async Load(client:Client){
+    /**
+     * Loads the events from the /events folder.
+     * @param {Client} client A client from discord.js
+     * @returns {Promise<number>} The amount of events loaded.
+     */
+    public async Load(client:Client): Promise<number>{
         const eventFiles = fs.readdirSync(this.eventsFolderPath).filter(file => file.endsWith('.js'));
 
         let eventPromises = [];

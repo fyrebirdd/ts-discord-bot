@@ -12,4 +12,4 @@ export const command: BaseCommand = {
 			interaction.reply(`${msg.createdTimestamp - interaction.createdTimestamp}ms`);
 		});
 	}
-};
+}; 

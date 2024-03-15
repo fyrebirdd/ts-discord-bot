@@ -1,10 +1,7 @@
 import Commands from "./utils/CommandLoader.js";
 import Events from "./utils/EventLoader.js";
-import Data from "./utils/dataFolderUtils.js";
 
 import { Client, GatewayIntentBits } from "discord.js";
-
-Data.LoadDotEnv();
 
 const client:Client = new Client({intents:[
     GatewayIntentBits.Guilds, 

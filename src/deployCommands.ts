@@ -1,10 +1,6 @@
 import { REST, Routes } from 'discord.js';
 import { BaseCommand } from './types/BaseCommand';
-
 import Commands from './utils/CommandLoader.js';
-import Data from './utils/dataFolderUtils';
-
-Data.LoadDotEnv();
 
 const rest = new REST().setToken(process.env.TEMPLATE_TOKEN);
 
