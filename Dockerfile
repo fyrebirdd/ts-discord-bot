@@ -1,9 +1,8 @@
 FROM node:latest
 RUN mkdir ./app
-WORKDIR /app
+WORKDIR ./app
 COPY ./package.json .
 RUN npm install
-COPY ./build ./app
+COPY ./build .
 
-
-CMD ["node", "./index.js"]
+CMD ["node", "index.js"]
