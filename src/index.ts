@@ -12,14 +12,23 @@ const client:Client = new Client({intents:[
     GatewayIntentBits.GuildMessageReactions
 ]});
 
-console.log("LOADING COMMANDS...");
+console.log("- - - - - LOADING COMMANDS - - - - -\n");
 let commandsLoaded = await Commands.Load();
-console.log(`Loaded ${commandsLoaded.loaded} commands.`);
-console.log(`Updated ${commandsLoaded.updated} commands.`);
-console.log(`Deleted ${commandsLoaded.deleted} commands.`);
 
-console.log("LOADING EVENTS...");
+console.log(`Deployed ${commandsLoaded.totalDeployed} new command(s)`);
+console.log(`Deleted ${commandsLoaded.totalDeleted} command(s)`);
+console.log(`Loaded ${commandsLoaded.totalLoaded} command(s).`);
+
+
+console.log('\n');
+
+
+console.log("- - - - - LOADING EVENTS - - - - -\n");
 let eventsLoaded = await Events.Load(client);
 console.log(`Loaded ${eventsLoaded} events.`);
+
+
+console.log('\n');
+
 
 client.login(process.env.TEMPLATE_TOKEN);

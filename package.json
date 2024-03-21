@@ -4,8 +4,9 @@
   "description": "A template for a discord bot made in Typescript",
   "main": "build/index.js",
   "scripts": {
-    "build": "rimraf build && npx tsc && docker build .",
-    "bot": "node build/index.js"
+    "build": "rimraf build && npx tsc",
+    "build-docker": "docker build . -t bot-container",
+    "bot-docker": "docker run --env-file=./bot.env  bot-container"
   },
   "author": "Fyrebirdd",
   "license": "ISC",

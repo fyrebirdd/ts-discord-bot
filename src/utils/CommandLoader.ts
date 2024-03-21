@@ -4,9 +4,40 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { BaseCommand } from '../types/BaseCommand';
 import {Routes, REST, ApplicationCommand} from 'discord.js';
 
+type CommandIDString = string;
+
+interface CommandDeployStruct{
+    guild: any[],
+    global: any[],
+};
+
+interface CommandDeleteStruct{
+    guild: CommandIDString[],
+    global: CommandIDString[],
+}
+
+interface DeployedCommandsStruct{
+    guild: ApplicationCommand[],
+    global: ApplicationCommand[],
+}
+
+interface CommandsFromFileStruct{
+    guild: BaseCommand[],
+    global: BaseCommand[],
+    commandsMap: Map<string, BaseCommand>,
+}
+
+interface CommandsLoadedInfoStruct{
+    totalLoaded: number,
+    totalDeployed: number,
+    totalDeleted: number,
+}
+
 class CommandLoader{
-    private commands: Map<string, BaseCommand>;
+
     private static instance: CommandLoader| null = null;
+
+    private commands: Map<string, BaseCommand>;
     private commandsFolderPath: string | null = null;
     private rest: REST;
 
@@ -14,6 +45,7 @@ class CommandLoader{
         this.commands = new Map();
         let workingDir = path.dirname(fileURLToPath(import.meta.url));
         this.commandsFolderPath = path.resolve(workingDir, '../commands');
+        this.rest = new REST().setToken(process.env.TEMPLATE_TOKEN);
     }
 
     public static getInstance(){
@@ -29,11 +61,7 @@ class CommandLoader{
      * @returns true if obj can be cast to BaseCommand type, false otherwise.
      */
     public static isCommand(obj: any){
-        return obj instanceof Object &&
-            'execute' in obj &&
-            typeof obj.execute === 'function' &&
-            'data' in obj &&
-            typeof obj.data === 'object';
+        return (obj as BaseCommand).data !== undefined;
     }
 
     /**
@@ -44,6 +72,7 @@ class CommandLoader{
     public Fetch(name:string): BaseCommand{
         return this.commands.get(name);
     }
+
     /**
      * Returns the entire command list.
      * @returns {Map<string, BaseCommand>} The current list of commands.
@@ -53,165 +82,189 @@ class CommandLoader{
     }
 
     /**
-     * Loads the commands from the /commands directory
-     * @returns {Promise<number>} The number of commands that were loaded
+     * Loads the commands in the /commands directory. Automatically deploys and deletes commands as needed.
+     * @returns {Promise<CommandsLoadedInfoStruct>} Number of commands that were loaded/deployed/deleted.
      */
-    public async Load(): Promise<{loaded:number, deleted:number, updated:number}>{
+    public async Load(): Promise<CommandsLoadedInfoStruct>{
+
         if (this.commandsFolderPath == null) throw new Error("Commands path not set!");
 
-        const newCommands = new Map<string, BaseCommand>();
         const commandFolders = fs.readdirSync(this.commandsFolderPath);
 
-        var totalCommandsLoaded =  0;
-        const promises = [];
+        const commandsFromFile = await this.LoadCommandsFromFile(commandFolders);
+        const deployedCommands = await this.FetchDeployedCommands();
+
+        this.commands = commandsFromFile.commandsMap;
+
+        const commandsToDeploy = this.FindCommandsToDeploy(commandsFromFile, deployedCommands);
+        const commandsToDelete = this.FindCommandsToDelete(commandsFromFile, deployedCommands);
+
+        const numDeployed = await this.DeployNewCommands(commandsToDeploy);
+        const numDeleted = await this.DeleteCommands(commandsToDelete);
+
+        const info:CommandsLoadedInfoStruct = {
+            totalLoaded: commandsFromFile.commandsMap.size,
+            totalDeployed: numDeployed,
+            totalDeleted: numDeleted,
+        };
+
+        return info;
+    }
+
+    private async LoadCommandsFromFile(commandFolders: string[]):Promise<CommandsFromFileStruct>{
+        let commandsLoadedFromFile = 0;
+        let commandPromises = [];
+        let newCommands = new Map<string, BaseCommand>();
+        let loadedCommands:CommandsFromFileStruct = {global: [], guild: [], commandsMap: new Map<string, BaseCommand>()};
 
         for (const folder of commandFolders) {
+
             const commandsPath = path.join(this.commandsFolderPath, folder);
             const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+
             for (const file of commandFiles) {
+
                 const filePath = path.join(commandsPath, file);
                 let fileToImport = pathToFileURL(filePath).href;
-                var commandLoadPromise = import(fileToImport).then(command => {
+
+                var commandLoadPromise = import(fileToImport).then((command) => {
+
                     if (CommandLoader.isCommand(command.command)) {
-                        newCommands.set(command.command.data.name, command.command);
-                        totalCommandsLoaded++;
+
+                        let loadedCommand:BaseCommand = command.command as BaseCommand;
+
+                        newCommands.set(loadedCommand.data.name, loadedCommand);
+                        commandsLoadedFromFile++;
+
+                        if (loadedCommand.global){
+                            loadedCommands.global.push(loadedCommand);
+                        }
+                        else{
+                            loadedCommands.guild.push(loadedCommand);
+                        }
+
+                        loadedCommands.commandsMap.set(loadedCommand.data.name, loadedCommand);
+
                     } else {
                         console.log(`Command ${file} was not loaded.`);
                     }
                 });
-                promises.push(commandLoadPromise);
+                commandPromises.push(commandLoadPromise);
             }
         }
-        await Promise.all(promises);
-        this.commands = newCommands;
-
-        let commandsToUpdate = await this.GetCommandsToUpdate();
-
-        let commandsToAdd = {global: [],guild: []};
-        let commandsToDelete = {global: [],guild: []};
-
-        commandsToUpdate.forEach((deleted, name) => {
-            let command = this.commands.get(name);
-            
-            if (deleted){
-                command.global ? commandsToDelete.global.push(name) : 
-                                 commandsToDelete.guild.push(name);
-            }
-            else{
-                command.global ? commandsToAdd.global.push(command.data.toJSON()) : 
-                                 commandsToAdd.guild.push(command.data.toJSON());
-            }
-        });
-
-        await this.UpdateCommands(commandsToAdd, commandsToDelete);
-
-
-
-        return {
-            loaded: this.commands.size,
-            deleted: commandsToDelete.global.length + commandsToDelete.guild.length,
-            updated: commandsToAdd.global.length + commandsToAdd.guild.length
-        };
+        await Promise.all(commandPromises);
+        return loadedCommands;
     }
 
-    private async UpdateCommands(commandsToAdd: {global: any[], guild: any[]}, commandsToDelete){
-        
+    private FindCommandsToDeploy(local: CommandsFromFileStruct, deployed: DeployedCommandsStruct): CommandDeployStruct{
+        let commandsToDeploy: CommandDeployStruct = {global: [], guild: []};
 
-        if (commandsToAdd.global.length > 0){
-            try{
+        for (const command of local.global){
+            const commandExists = deployed.global.some(dCommand => dCommand.name === command.data.name);
+            if (commandExists){
+                commandsToDeploy.global.push(command.data.toJSON());
+            }
+        }
+
+        for (const command of local.guild){
+            const commandExists = deployed.guild.some(dCommand => dCommand.name === command.data.name);
+            if (commandExists){
+                commandsToDeploy.guild.push(command.data.toJSON());
+            }
+        }
+
+        return commandsToDeploy;
+    }
+
+    private FindCommandsToDelete(local: CommandsFromFileStruct, deployed: DeployedCommandsStruct): CommandDeleteStruct{
+        let commandsToDelete: CommandDeleteStruct = {global: [], guild: []};
+
+        for (const dCommand of deployed.global){
+            const commandExists = deployed.global.some(command => command.name === dCommand.name);
+            if (commandExists){
+                commandsToDelete.global.push(dCommand.id);
+            }
+        }
+
+        for (const dCommand of deployed.guild){
+            const commandExists = deployed.guild.some(command => command.name === dCommand.name);
+            if (commandExists){
+                commandsToDelete.guild.push(dCommand.id);
+            }
+        }
+
+        return commandsToDelete;
+    }
+    
+    private async DeployNewCommands(commandsToDeploy: CommandDeployStruct): Promise<number>{
+        let commandsDeployed = 0;
+        try{
+            if (commandsToDeploy.global.length > 0){
                 await this.rest.put(
                     Routes.applicationCommands(process.env.TEMPLATE_CLIENT_ID),
-                    { body: commandsToAdd.global },
+                    { body: commandsToDeploy.global },
                 );
+                commandsDeployed += commandsToDeploy.global.length;
             }
-            catch(err){
-                console.log(`Error updating global commands: ${err}`)
-            } 
-        }
-        if (commandsToAdd.guild.length > 0){
-            try{
+            if (commandsToDeploy.guild.length > 0){
                 await this.rest.put(
                     Routes.applicationGuildCommands(process.env.TEMPLATE_CLIENT_ID, process.env.TEMPLATE_GUILD_ID),
-                    { body: commandsToAdd.guild },
+                    { body: commandsToDeploy.guild },
                 );
+                commandsDeployed += commandsToDeploy.guild.length;
             }
-            catch(err){
-                console.log(`Error updating guild commands: ${err}`)
-            }
+        }
+        catch(err){
+            console.log(`- - - Error deploying commands - - -\n${err}`);
         }
 
-        if (commandsToDelete.global.length > 0){
-            try{
-                await commandsToDelete.global.forEach( async (id) => {
-                    await this.rest.delete(
-                        Routes.applicationCommands(process.env.TEMPLATE_CLIENT_ID),
-                        { body: id},
-                    );
-                });
-                
-            }
-            catch(err){
-                console.log(`Error deleting global commands: ${err}`)
-            } 
-        }
-        if (commandsToDelete.guild.length > 0){
-            try{
-               await commandsToDelete.guild.foreach(async (id) => {
-                    await this.rest.delete(
-                        Routes.applicationGuildCommands(process.env.TEMPLATE_CLIENT_ID, process.env.TEMPLATE_GUILD_ID),
-                        { body: id},
-                    );
-                })
-            }
-            catch(err){
-                console.log(`Error deleting guild commands: ${err}`)
-            }
-        }
+        return commandsDeployed;
     }
 
-    private async GetCommandsToUpdate(): Promise<Map<string, boolean>>{
+    private async DeleteCommands(commandsToDelete: CommandDeleteStruct): Promise<number>{
+        let commandsDeleted = 0;
+        try{
+            if (commandsToDelete.global.length > 0){
+                commandsToDelete.global.forEach( async (id) => {
+                    await this.rest.delete(
+                        Routes.applicationCommand(process.env.TEMPLATE_CLIENT_ID, `${id}`)
+                    );
+                    commandsDeleted++;
+                });
+            }
+            if (commandsToDelete.guild.length > 0){
+                commandsToDelete.guild.forEach( async (id) => {
+                    await this.rest.delete(
+                        Routes.applicationGuildCommand(process.env.TEMPLATE_CLIENT_ID, process.env.TEMPLATE_GUILD_ID, `${id}`)
+                    );
+                    commandsDeleted++;
+                })
+            }
+        }
+        catch(err){
+            console.log(`- - - Error deleting command - - -\n${err}`);
+        }
+        
+
+        return commandsDeleted;
+    }
+
+    private async FetchDeployedCommands(): Promise<DeployedCommandsStruct>{
         this.rest = new REST().setToken(process.env.TEMPLATE_TOKEN);
+
         let guildCommands = await this.rest.get(
             Routes.applicationGuildCommands(process.env.TEMPLATE_CLIENT_ID, process.env.TEMPLATE_GUILD_ID)
         ) as ApplicationCommand[];
+
         let globalCommands = await this.rest.get(
             Routes.applicationCommands(process.env.TEMPLATE_CLIENT_ID)
         ) as ApplicationCommand[];
 
-        let commandsToUpdate = new Map<string, boolean>();
-
-        this.commands.forEach( ((command, name) => {
-            if (command.global){
-                for (let i = 0; i < globalCommands.length; i++){
-                    if (globalCommands[i].name===name){
-                        return;
-                    }
-                } 
-            }
-            else{
-                for (let i = 0; i < guildCommands.length; i++){
-                    if (guildCommands[i].name===name){
-                        return;
-                    }
-                }
-            }
-            commandsToUpdate.set(name, false);
-        }));
-
-        guildCommands.forEach((c)=>{
-            if (!this.commands.has(c.name)){
-                commandsToUpdate.set(c.id, true);
-            }
-        });
-        globalCommands.forEach((c)=>{
-            if (!this.commands.has(c.name)){
-                commandsToUpdate.set(c.id, true);
-            }
-        });
-        
-        return commandsToUpdate;
+        return {
+            guild: guildCommands,
+            global: globalCommands
+        };
     }
-    
 
 }
 
