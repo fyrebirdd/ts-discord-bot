@@ -4,6 +4,10 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { Client, ClientEvents } from "discord.js";
 
+interface EventLoadInfo{
+    numEvents: number,
+    eventsLoaded: string[],
+}
 
 class EventLoader{
     private static instance: EventLoader| null = null;
@@ -41,8 +45,9 @@ class EventLoader{
      * @param {Client} client A client from discord.js
      * @returns {Promise<number>} The amount of events loaded.
      */
-    public async Load(client:Client): Promise<number>{
+    public async Load(client:Client): Promise<EventLoadInfo>{
         const eventFiles = fs.readdirSync(this.eventsFolderPath).filter(file => file.endsWith('.js'));
+        let info:EventLoadInfo = {numEvents: 0, eventsLoaded: []};
 
         let eventPromises = [];
         let eventsLoaded =0;
@@ -55,13 +60,14 @@ class EventLoader{
                     } else {
                         client.on(event.event.name as keyof ClientEvents, (...args) => event.event.execute(...args));
                     }
-                    eventsLoaded++;
+                    info.eventsLoaded.push(event.event.name);
+                    info.numEvents++;
                 }
 	        });
             eventPromises.push(prms);
         }
         await Promise.all(eventPromises);
-        return eventsLoaded;
+        return info;
     }
 }
 

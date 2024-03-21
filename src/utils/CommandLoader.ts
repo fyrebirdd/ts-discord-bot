@@ -4,22 +4,10 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { BaseCommand } from '../types/BaseCommand';
 import {Routes, REST, ApplicationCommand} from 'discord.js';
 
-type CommandIDString = string;
-
 interface CommandDeployStruct{
     guild: any[],
     global: any[],
 };
-
-interface CommandDeleteStruct{
-    guild: CommandIDString[],
-    global: CommandIDString[],
-}
-
-interface DeployedCommandsStruct{
-    guild: ApplicationCommand[],
-    global: ApplicationCommand[],
-}
 
 interface CommandsFromFileStruct{
     guild: BaseCommand[],
@@ -29,8 +17,13 @@ interface CommandsFromFileStruct{
 
 interface CommandsLoadedInfoStruct{
     totalLoaded: number,
-    totalDeployed: number,
-    totalDeleted: number,
+    commandsLoaded: string[],
+    deployed: boolean,
+}
+
+interface DeployedCommandsStruct{
+    global: ApplicationCommand[],
+    guild: ApplicationCommand[],
 }
 
 class CommandLoader{
@@ -82,7 +75,7 @@ class CommandLoader{
     }
 
     /**
-     * Loads the commands in the /commands directory. Automatically deploys and deletes commands as needed.
+     * Loads the commands in the /commands directory. Automatically deploys commands as needed.
      * @returns {Promise<CommandsLoadedInfoStruct>} Number of commands that were loaded/deployed/deleted.
      */
     public async Load(): Promise<CommandsLoadedInfoStruct>{
@@ -92,20 +85,24 @@ class CommandLoader{
         const commandFolders = fs.readdirSync(this.commandsFolderPath);
 
         const commandsFromFile = await this.LoadCommandsFromFile(commandFolders);
-        const deployedCommands = await this.FetchDeployedCommands();
+        const commandsFromDiscord = await this.FetchDeployedCommands();
+
+        let deploy = this.CheckNeedsDeployment(commandsFromFile, commandsFromDiscord);
+        if(deploy){
+            let deployStruct:CommandDeployStruct = {guild: [], global: []};
+
+            commandsFromFile.global.forEach((c)=>{deployStruct.global.push(c.data.toJSON())});
+            commandsFromFile.guild.forEach((c)=>{deployStruct.guild.push(c.data.toJSON())});
+
+            await this.DeployCommands(deployStruct);
+        }
 
         this.commands = commandsFromFile.commandsMap;
 
-        const commandsToDeploy = this.FindCommandsToDeploy(commandsFromFile, deployedCommands);
-        const commandsToDelete = this.FindCommandsToDelete(commandsFromFile, deployedCommands);
-
-        const numDeployed = await this.DeployNewCommands(commandsToDeploy);
-        const numDeleted = await this.DeleteCommands(commandsToDelete);
-
         const info:CommandsLoadedInfoStruct = {
             totalLoaded: commandsFromFile.commandsMap.size,
-            totalDeployed: numDeployed,
-            totalDeleted: numDeleted,
+            commandsLoaded: Array.from(this.commands.keys()),
+            deployed: deploy
         };
 
         return info;
@@ -136,11 +133,11 @@ class CommandLoader{
                         newCommands.set(loadedCommand.data.name, loadedCommand);
                         commandsLoadedFromFile++;
 
-                        if (loadedCommand.global){
-                            loadedCommands.global.push(loadedCommand);
+                        if (!loadedCommand.global){
+                            loadedCommands.guild.push(loadedCommand);
                         }
                         else{
-                            loadedCommands.guild.push(loadedCommand);
+                            loadedCommands.global.push(loadedCommand);
                         }
 
                         loadedCommands.commandsMap.set(loadedCommand.data.name, loadedCommand);
@@ -155,49 +152,10 @@ class CommandLoader{
         await Promise.all(commandPromises);
         return loadedCommands;
     }
-
-    private FindCommandsToDeploy(local: CommandsFromFileStruct, deployed: DeployedCommandsStruct): CommandDeployStruct{
-        let commandsToDeploy: CommandDeployStruct = {global: [], guild: []};
-
-        for (const command of local.global){
-            const commandExists = deployed.global.some(dCommand => dCommand.name === command.data.name);
-            if (commandExists){
-                commandsToDeploy.global.push(command.data.toJSON());
-            }
-        }
-
-        for (const command of local.guild){
-            const commandExists = deployed.guild.some(dCommand => dCommand.name === command.data.name);
-            if (commandExists){
-                commandsToDeploy.guild.push(command.data.toJSON());
-            }
-        }
-
-        return commandsToDeploy;
-    }
-
-    private FindCommandsToDelete(local: CommandsFromFileStruct, deployed: DeployedCommandsStruct): CommandDeleteStruct{
-        let commandsToDelete: CommandDeleteStruct = {global: [], guild: []};
-
-        for (const dCommand of deployed.global){
-            const commandExists = deployed.global.some(command => command.name === dCommand.name);
-            if (commandExists){
-                commandsToDelete.global.push(dCommand.id);
-            }
-        }
-
-        for (const dCommand of deployed.guild){
-            const commandExists = deployed.guild.some(command => command.name === dCommand.name);
-            if (commandExists){
-                commandsToDelete.guild.push(dCommand.id);
-            }
-        }
-
-        return commandsToDelete;
-    }
     
-    private async DeployNewCommands(commandsToDeploy: CommandDeployStruct): Promise<number>{
+    private async DeployCommands(commandsToDeploy: CommandDeployStruct): Promise<number>{
         let commandsDeployed = 0;
+
         try{
             if (commandsToDeploy.global.length > 0){
                 await this.rest.put(
@@ -214,39 +172,12 @@ class CommandLoader{
                 commandsDeployed += commandsToDeploy.guild.length;
             }
         }
+
         catch(err){
             console.log(`- - - Error deploying commands - - -\n${err}`);
         }
 
         return commandsDeployed;
-    }
-
-    private async DeleteCommands(commandsToDelete: CommandDeleteStruct): Promise<number>{
-        let commandsDeleted = 0;
-        try{
-            if (commandsToDelete.global.length > 0){
-                commandsToDelete.global.forEach( async (id) => {
-                    await this.rest.delete(
-                        Routes.applicationCommand(process.env.TEMPLATE_CLIENT_ID, `${id}`)
-                    );
-                    commandsDeleted++;
-                });
-            }
-            if (commandsToDelete.guild.length > 0){
-                commandsToDelete.guild.forEach( async (id) => {
-                    await this.rest.delete(
-                        Routes.applicationGuildCommand(process.env.TEMPLATE_CLIENT_ID, process.env.TEMPLATE_GUILD_ID, `${id}`)
-                    );
-                    commandsDeleted++;
-                })
-            }
-        }
-        catch(err){
-            console.log(`- - - Error deleting command - - -\n${err}`);
-        }
-        
-
-        return commandsDeleted;
     }
 
     private async FetchDeployedCommands(): Promise<DeployedCommandsStruct>{
@@ -266,6 +197,34 @@ class CommandLoader{
         };
     }
 
+    private CheckNeedsDeployment(local: CommandsFromFileStruct, deployed: DeployedCommandsStruct): boolean{
+        
+        if (deployed.global.length != local.global.length) return true;
+
+        let matchingCommands = 0;
+        deployed.global.forEach((deployedCommand) => {
+            local.global.forEach((localCommand) =>{
+                if (deployedCommand.name === localCommand.data.name){
+                    matchingCommands++;
+                }
+            });
+        });
+
+        if (matchingCommands !== local.global.length || matchingCommands !== deployed.global.length) return true;
+
+        matchingCommands = 0;
+        deployed.guild.forEach((deployedCommand) => {
+            local.guild.forEach((localCommand) =>{
+                if (deployedCommand.name === localCommand.data.name){
+                    matchingCommands++;
+                }
+            });
+        });
+
+        if (matchingCommands !== local.guild.length || matchingCommands !== deployed.guild.length) return true;
+
+        return false;
+    }
 }
 
 const Commands = CommandLoader.getInstance();

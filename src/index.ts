@@ -15,9 +15,11 @@ const client:Client = new Client({intents:[
 console.log("- - - - - LOADING COMMANDS - - - - -\n");
 let commandsLoaded = await Commands.Load();
 
-console.log(`Deployed ${commandsLoaded.totalDeployed} new command(s)`);
-console.log(`Deleted ${commandsLoaded.totalDeleted} command(s)`);
-console.log(`Loaded ${commandsLoaded.totalLoaded} command(s).`);
+console.log(`Loading ${commandsLoaded.totalLoaded} command(s)...`);
+commandsLoaded.commandsLoaded.forEach((c) => {
+    console.log(`Loaded command "${c}"`);
+})
+if (commandsLoaded.deployed) console.log("Redeployed Commands");
 
 
 console.log('\n');
@@ -25,7 +27,11 @@ console.log('\n');
 
 console.log("- - - - - LOADING EVENTS - - - - -\n");
 let eventsLoaded = await Events.Load(client);
-console.log(`Loaded ${eventsLoaded} events.`);
+
+console.log(`Loading ${eventsLoaded.numEvents} events...`);
+eventsLoaded.eventsLoaded.forEach((e)=>{
+    console.log(`Loaded event "${e}"`);
+});
 
 
 console.log('\n');
