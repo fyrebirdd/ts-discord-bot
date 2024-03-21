@@ -45,10 +45,6 @@ class DatabaseConnection {
         const res = await this.query(`INSERT INTO ${table} (${keys}) VALUES (${values})`);
         return res;
     }
-
-    public Test(){
-        console.log(this.database);
-    }
 }
 
 const DB = DatabaseConnection.getInstance();
