@@ -38,7 +38,7 @@ class CommandLoader{
         this.commands = new Map();
         let workingDir = path.dirname(fileURLToPath(import.meta.url));
         this.commandsFolderPath = path.resolve(workingDir, '../commands');
-        this.rest = new REST().setToken(process.env.TEMPLATE_TOKEN);
+        this.rest = new REST().setToken(process.env.BOT_TOKEN);
     }
 
     public static getInstance(){
@@ -88,13 +88,14 @@ class CommandLoader{
         const commandsFromDiscord = await this.FetchDeployedCommands();
 
         let deploy = this.CheckNeedsDeployment(commandsFromFile, commandsFromDiscord);
-        if(deploy){
+        if(deploy || process.argv[2] == 'deploy'){
             let deployStruct:CommandDeployStruct = {guild: [], global: []};
 
             commandsFromFile.global.forEach((c)=>{deployStruct.global.push(c.data.toJSON())});
             commandsFromFile.guild.forEach((c)=>{deployStruct.guild.push(c.data.toJSON())});
 
             await this.DeployCommands(deployStruct);
+            deploy = true;
         }
 
         this.commands = commandsFromFile.commandsMap;
@@ -157,20 +158,15 @@ class CommandLoader{
         let commandsDeployed = 0;
 
         try{
-            if (commandsToDeploy.global.length > 0){
-                await this.rest.put(
-                    Routes.applicationCommands(process.env.TEMPLATE_CLIENT_ID),
-                    { body: commandsToDeploy.global },
-                );
-                commandsDeployed += commandsToDeploy.global.length;
-            }
-            if (commandsToDeploy.guild.length > 0){
-                await this.rest.put(
-                    Routes.applicationGuildCommands(process.env.TEMPLATE_CLIENT_ID, process.env.TEMPLATE_GUILD_ID),
-                    { body: commandsToDeploy.guild },
-                );
-                commandsDeployed += commandsToDeploy.guild.length;
-            }
+            await this.rest.put(
+                Routes.applicationCommands(process.env.BOT_CLIENT_ID),
+                { body: commandsToDeploy.global.length > 0 ? commandsToDeploy.global: [] },
+            );
+            commandsDeployed += commandsToDeploy.global.length;
+            await this.rest.put(
+                Routes.applicationGuildCommands(process.env.BOT_CLIENT_ID, process.env.BOT_GUILD_ID),
+                { body: commandsToDeploy.guild.length > 0 ? commandsToDeploy.guild : []},
+            );
         }
 
         catch(err){
@@ -181,14 +177,14 @@ class CommandLoader{
     }
 
     private async FetchDeployedCommands(): Promise<DeployedCommandsStruct>{
-        this.rest = new REST().setToken(process.env.TEMPLATE_TOKEN);
+        this.rest = new REST().setToken(process.env.BOT_TOKEN);
 
         let guildCommands = await this.rest.get(
-            Routes.applicationGuildCommands(process.env.TEMPLATE_CLIENT_ID, process.env.TEMPLATE_GUILD_ID)
+            Routes.applicationGuildCommands(process.env.BOT_CLIENT_ID, process.env.BOT_GUILD_ID)
         ) as ApplicationCommand[];
 
         let globalCommands = await this.rest.get(
-            Routes.applicationCommands(process.env.TEMPLATE_CLIENT_ID)
+            Routes.applicationCommands(process.env.BOT_CLIENT_ID)
         ) as ApplicationCommand[];
 
         return {

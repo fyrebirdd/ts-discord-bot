@@ -6,7 +6,7 @@ export const command: BaseCommand = {
 	.setName('ping')
 	.setDescription('Posts the bots ping.'),
 
-	global: false,
+	global: true,
 
 	execute: async (interaction) => {
 		interaction.channel.send('.').then (async (msg) =>{

@@ -6,8 +6,11 @@ export const event: BaseEvent = {
 	name: Events.InteractionCreate,
 	once: false,
 	execute: async (interaction: Interaction) => {
+
         //Other interactions can go here.
          
+
+		// SLASH COMMAND HANDLER
 		if (interaction.isChatInputCommand()){
             interaction = interaction as ChatInputCommandInteraction;
 
@@ -28,7 +31,5 @@ export const event: BaseEvent = {
 			    }
 		    }
         };
-		
 	}
-
 }

@@ -50,7 +50,6 @@ class EventLoader{
         let info:EventLoadInfo = {numEvents: 0, eventsLoaded: []};
 
         let eventPromises = [];
-        let eventsLoaded =0;
         for (const file of eventFiles) {
 	        const filePath = path.join(this.eventsFolderPath, file);
 	        let prms = import(pathToFileURL(filePath).href).then(event => {

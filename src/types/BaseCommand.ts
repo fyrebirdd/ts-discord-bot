@@ -2,7 +2,7 @@ import { ChatInputCommandInteraction, ContextMenuCommandBuilder, SlashCommandBui
 export interface BaseCommand {
     data: Omit<SlashCommandBuilder, "addSubcommand" | "addSubcommandGroup"> 
     | SlashCommandSubcommandsOnlyBuilder
-    | ContextMenuCommandBuilder;
+    | ContextMenuCommandBuilder,
     global: boolean,
     execute: (interaction: ChatInputCommandInteraction) => Promise<void>;
 }

@@ -4,7 +4,7 @@ import { BaseEvent } from "../types/BaseEvent";
 export const event: BaseEvent = {
 	name: Events.ClientReady,
 	once: true,
-	execute: (client:Client) => {
-		console.log(`Ready! Logged in as ${client.user.tag}`);
+	execute: async (client:Client) => {
+		console.log(`Client session is now valid`);
 	}
 };

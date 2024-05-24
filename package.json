@@ -5,23 +5,23 @@
   "main": "build/index.js",
   "scripts": {
     "build": "rimraf build && npx tsc",
-    "build-docker": "docker build . -t bot-container",
+    "build-docker": "npm run build && docker build . -t bot-container",
     "bot": "npm run build && env-cmd node ./build/index.js",
     "bot-docker": "npm run build-docker && docker run --env-file=./.env  bot-container"
   },
   "author": "Fyrebirdd",
   "license": "ISC",
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.10",
     "@types/node": "^20.11.18",
-    "@types/sqlite3": "^3.1.11",
     "dotenv": "^16.4.5",
     "env-cmd": "^10.1.0",
     "rimraf": "^5.0.5",
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "sqlite3": "^5.1.7"
+    "better-sqlite3": "^10.0.0",
+    "discord.js": "^14.14.1"
   },
   "type": "module"
 }
