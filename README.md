@@ -91,7 +91,7 @@ export interface BaseEvent {
 }
 ```
 
-Each event will have its own execute function with its own perameters, a list of which can be found [here](https://discord.js.org/docs/packages/discord.js/14.15.2/Client:Class) in the events section.
+Each event will have its own execute function with its own parameters, a list of which can be found [here](https://discord.js.org/docs/packages/discord.js/14.15.2/Client:Class) in the events section.
 
 Below is an example of the Ready event:
 
