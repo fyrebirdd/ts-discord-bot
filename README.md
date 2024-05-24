@@ -1,5 +1,5 @@
 # ts-discord-bot
-This is the template i use for most of my discord bots, with some example functions added in.
+This is the template i use for most of my discord bots.
 
 # Installation
 Clone the repository and run ```npm install```.<br>
